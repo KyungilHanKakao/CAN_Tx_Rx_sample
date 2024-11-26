@@ -58,6 +58,7 @@ void Error_Handler(void);
 /* USER CODE END EFP */
 
 /* Private defines -----------------------------------------------------------*/
+#define CAN_BAUD 500000
 
 /* USER CODE BEGIN Private defines */
 

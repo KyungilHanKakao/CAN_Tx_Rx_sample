@@ -25,7 +25,8 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-
+#include <stdio.h>
+#include "veml7700.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -46,6 +47,7 @@
 /* Private variables ---------------------------------------------------------*/
 /* USER CODE BEGIN Variables */
 
+extern I2C_HandleTypeDef hi2c1;
 extern CAN_HandleTypeDef hcan;
 CAN_RxHeaderTypeDef rxHeader; //CAN Bus Transmit Header
 CAN_TxHeaderTypeDef txHeader; //CAN Bus Receive Header
@@ -180,7 +182,55 @@ void StartDefaultTask(void const * argument)
 void StartTask02(void const * argument)
 {
   /* USER CODE BEGIN StartTask02 */
+
+	// Somewhere in your main():
+	  #define VEML7700_I2C_ADDRESS    0x10
+
+	  // Init / power on sensor
+	  veml7700 veml;
+	  veml7700_init(&veml, &hi2c1, VEML7700_I2C_ADDRESS);
+	  veml7700_power_on(&veml);
+	  veml7700_set_als_gain(&veml,REG_ALS_CONF_GAIN_1_4 );
+	  veml7700_set_als_integration_time(&veml,REG_ALS_CONF_IT800 );
+
+
+
+	  while(1){
+		  uint16_t als = veml7700_read_als(&veml);
+		  uint16_t white = veml7700_read_white(&veml);
+		  uint16_t id= veml7700_getID(&veml);
+		  uint16_t cal_als= als * (veml.resolution);
+
+
+
+		  printf("cal_als %d\n", cal_als);
+		  printf("white %d\n", white);
+		  printf("id %x\n", id);
+
+		  if(cal_als <100){
+			  veml7700_set_als_gain(&veml,REG_ALS_CONF_GAIN_2 );
+			  veml7700_set_als_integration_time(&veml,REG_ALS_CONF_IT800 );
+			  printf("Change : g2,it800");
+		  }
+		  else if(cal_als > 1000 ){
+			  veml7700_set_als_gain(&veml,REG_ALS_CONF_GAIN_1_8 );
+			  veml7700_set_als_integration_time(&veml,REG_ALS_CONF_IT800 );
+			  printf("Change : g1_8,it800");
+		  }
+		  else{
+			  veml7700_set_als_gain(&veml,REG_ALS_CONF_GAIN_1_4 );
+			  veml7700_set_als_integration_time(&veml,REG_ALS_CONF_IT800 );
+			  printf("Change : g1_4,it800");
+		  }
+
+		  osDelay(1000);
+	  }
+
+	  // VEML7700 constantly measuring values, so turn it off to save power
+	  veml7700_shutdown(&veml);
+
   /* Infinite loop */
+
   for(;;)
   {
     osDelay(1);

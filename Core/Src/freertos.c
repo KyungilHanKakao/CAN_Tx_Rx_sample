@@ -27,6 +27,8 @@
 /* USER CODE BEGIN Includes */
 #include <stdio.h>
 #include "veml7700.h"
+#include "w25q.h"
+#include "Z_FLASH_W25QXXX.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -36,7 +38,7 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
-
+#define VEML7700_I2C_ADDRESS    0x10
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -49,6 +51,8 @@
 
 extern I2C_HandleTypeDef hi2c1;
 extern CAN_HandleTypeDef hcan;
+extern SPI_HandleTypeDef hspi1;
+
 CAN_RxHeaderTypeDef rxHeader; //CAN Bus Transmit Header
 CAN_TxHeaderTypeDef txHeader; //CAN Bus Receive Header
 uint8_t canRX[8] = {0,0,0,0,0,0,0,0};  //CAN Bus Receive Buffer
@@ -58,6 +62,7 @@ uint32_t canMailbox; //CAN Bus Mail box variable
 /* USER CODE END Variables */
 osThreadId defaultTaskHandle;
 osThreadId myTask02Handle;
+osThreadId myTask03Handle;
 
 /* Private function prototypes -----------------------------------------------*/
 /* USER CODE BEGIN FunctionPrototypes */
@@ -66,6 +71,7 @@ osThreadId myTask02Handle;
 
 void StartDefaultTask(void const * argument);
 void StartTask02(void const * argument);
+void StartTask03(void const * argument);
 
 void MX_FREERTOS_Init(void); /* (MISRA C 2004 rule 8.1) */
 
@@ -119,6 +125,10 @@ void MX_FREERTOS_Init(void) {
   /* definition and creation of myTask02 */
   osThreadDef(myTask02, StartTask02, osPriorityLow, 0, 128);
   myTask02Handle = osThreadCreate(osThread(myTask02), NULL);
+
+  /* definition and creation of myTask03 */
+  osThreadDef(myTask03, StartTask03, osPriorityBelowNormal, 0, 128);
+  myTask03Handle = osThreadCreate(osThread(myTask03), NULL);
 
   /* USER CODE BEGIN RTOS_THREADS */
   /* add threads, ... */
@@ -183,9 +193,6 @@ void StartTask02(void const * argument)
 {
   /* USER CODE BEGIN StartTask02 */
 
-	// Somewhere in your main():
-	  #define VEML7700_I2C_ADDRESS    0x10
-
 	  // Init / power on sensor
 	  veml7700 veml;
 	  veml7700_init(&veml, &hi2c1, VEML7700_I2C_ADDRESS);
@@ -210,17 +217,17 @@ void StartTask02(void const * argument)
 		  if(cal_als <100){
 			  veml7700_set_als_gain(&veml,REG_ALS_CONF_GAIN_2 );
 			  veml7700_set_als_integration_time(&veml,REG_ALS_CONF_IT800 );
-			  printf("Change : g2,it800");
+			  printf("Change : g2,it800\n");
 		  }
 		  else if(cal_als > 1000 ){
 			  veml7700_set_als_gain(&veml,REG_ALS_CONF_GAIN_1_8 );
 			  veml7700_set_als_integration_time(&veml,REG_ALS_CONF_IT800 );
-			  printf("Change : g1_8,it800");
+			  printf("Change : g1_8,it800\n");
 		  }
 		  else{
 			  veml7700_set_als_gain(&veml,REG_ALS_CONF_GAIN_1_4 );
 			  veml7700_set_als_integration_time(&veml,REG_ALS_CONF_IT800 );
-			  printf("Change : g1_4,it800");
+			  printf("Change : g1_4,it800\n");
 		  }
 
 		  osDelay(1000);
@@ -236,6 +243,46 @@ void StartTask02(void const * argument)
     osDelay(1);
   }
   /* USER CODE END StartTask02 */
+}
+
+/* USER CODE BEGIN Header_StartTask03 */
+/**
+* @brief Function implementing the myTask03 thread.
+* @param argument: Not used
+* @retval None
+*/
+/* USER CODE END Header_StartTask03 */
+void StartTask03(void const * argument)
+{
+  /* USER CODE BEGIN StartTask03 */
+	uint8_t uniqueID[8];
+	uint8_t writeData[8]={00,01,02,03,04,05,06,07};
+	Flash_Init();
+	/* Infinite loop */
+  for(;;)
+  {
+	  Flash_Reset();
+	  Flash_ReadUniqueID(uniqueID);
+	  printf("unique id = ");
+	  for(uint8_t i=0; i<8;i++){
+		  printf(" %x ",uniqueID[i]);
+	  }
+	  printf("\n");
+
+	  printf("power-down id = %04x\n",Flash_ReadDevID());
+	  printf("id = %04x\n",Flash_ReadManufactutrerAndDevID());
+	  printf("jedec id = %04lx\n",Flash_ReadJedecID());
+
+	  Flash_Write(0x00,writeData,8 );
+	  Flash_Read(0x00,uniqueID,8);
+	  printf("Flash_Read = ");
+	  for(uint8_t i=0; i<8;i++){
+		  printf(" %x ",uniqueID[i]);
+	  }
+	  printf("\n");
+	  osDelay(1500);
+  }
+  /* USER CODE END StartTask03 */
 }
 
 /* Private application code --------------------------------------------------*/
